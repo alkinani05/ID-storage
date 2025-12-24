@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserPlan {
+  FREE
+  PRO
+  FAMILY
+}
+
+enum DocCategory {
+  ID_CARD
+  PASSPORT
+  RESIDENCE
+  BILL
+  CERTIFICATE
+  CONTRACT
+  OTHER
+}
+
+enum DocStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum AccessType {
+  VIEW
+  DOWNLOAD
+  PRINT_ONLY
+}
+
+// Models
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  phone        String?
+  avatar       String?
+  nationality  String?
+  dateOfBirth  DateTime?
+  address      String?
+  bio          String?
+  plan         UserPlan  @default(FREE)
+  
+  // Settings
+  notifyExpiry    Boolean  @default(true)
+  notifySharing   Boolean  @default(true)
+  language        String   @default("ar")
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  documents     Document[]
+  tags          Tag[]
+  auditLogs     AuditLog[]
+}
+
+model Document {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id])
+  title        String
+  originalName String
+  r2Key        String
+  mimeType     String
+  size         Int
+  category     DocCategory @default(OTHER)
+  status       DocStatus   @default(PROCESSING)
+  expiryDate   DateTime?
+  isEncrypted  Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  extractedData ExtractedData[]
+  shares        DocumentShare[]
+}
+
+model ExtractedData {
+  id         String   @id @default(uuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+  fieldName  String
+  fieldValue String
+  confidence Float
+}
+
+model Tag {
+  id     String @id @default(uuid())
+  name   String
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model DocumentShare {
+  id              String     @id @default(uuid())
+  documentId      String
+  document        Document   @relation(fields: [documentId], references: [id])
+  token           String     @unique
+  expiresAt       DateTime
+  accessType      AccessType @default(VIEW)
+  allowDownload   Boolean    @default(false)
+  allowPrint      Boolean    @default(true)
+  oneTimeDownload Boolean    @default(false)
+  downloadUsed    Boolean    @default(false)
+  viewsCount      Int        @default(0)
+  maxViews        Int?       
+  createdAt       DateTime   @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  resourceId String?
+  ipAddress  String?
+  timestamp  DateTime @default(now())
+}
