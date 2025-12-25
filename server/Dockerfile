@@ -33,7 +33,9 @@ COPY --from=builder /app/*.traineddata ./
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=3001
+
+# Create uploads directory
+RUN mkdir -p /app/uploads
 
 EXPOSE 3001
 
