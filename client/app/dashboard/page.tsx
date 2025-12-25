@@ -10,7 +10,7 @@ import {
     Camera, FlipHorizontal, Zap, Focus, Sliders, Target, Gauge,
     FileCheck, Move, Activity, Brain, Crosshair, Mail, Copy
 } from 'lucide-react';
-import axios from 'axios';
+import api, { API_URL } from '@/lib/api';
 import { useDropzone } from 'react-dropzone';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -146,8 +146,8 @@ export default function Dashboard() {
     const fetchDocuments = async (query = '') => {
         try {
             const token = localStorage.getItem('token');
-            const url = query ? `http://localhost:3001/documents?q=${query}` : 'http://localhost:3001/documents';
-            const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+            const url = query ? `/documents?q=${query}` : '/documents';
+            const res = await api.get(url, { headers: { Authorization: `Bearer ${token}` } });
             setDocuments(res.data);
         } catch (err) { console.error(err); }
         finally { setLoadingDocs(false); }
@@ -175,7 +175,7 @@ export default function Dashboard() {
         setShareLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post(`http://localhost:3001/documents/${shareDocId}/share`, {
+            const res = await api.post(`/documents/${shareDocId}/share`, {
                 expiryHours: shareExpiry,
                 allowDownload: shareAllowDownload,
                 allowPrint: shareAllowPrint,
@@ -183,7 +183,7 @@ export default function Dashboard() {
                 maxViews: shareMaxViews
             }, { headers: { Authorization: `Bearer ${token}` } });
 
-            const link = `http://localhost:3002/share/${res.data.token}`;
+            const link = `${window.location.origin}/share/${res.data.token}`;
             setGeneratedShareLink(link);
             navigator.clipboard.writeText(link);
             fetchDocuments(); // Refresh to show new share
@@ -203,7 +203,7 @@ export default function Dashboard() {
     const loadUserProfile = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:3001/auth/profile', {
+            const res = await api.get('/auth/profile', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setUserProfile(res.data);
@@ -230,7 +230,7 @@ export default function Dashboard() {
         setSettingsLoading(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.put('http://localhost:3001/auth/profile', {
+            await api.put('/auth/profile', {
                 fullName: editFullName,
                 phone: editPhone,
                 nationality: editNationality,
@@ -265,7 +265,7 @@ export default function Dashboard() {
         setSettingsLoading(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.post('http://localhost:3001/auth/change-password', {
+            await api.post('/auth/change-password', {
                 currentPassword,
                 newPassword
             }, { headers: { Authorization: `Bearer ${token}` } });
@@ -290,7 +290,7 @@ export default function Dashboard() {
             const formData = new FormData();
             formData.append('file', file);
             try {
-                await axios.post('http://localhost:3001/documents/upload', formData, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } });
+                await api.post('/documents/upload', formData, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } });
                 fetchDocuments();
             } catch (e) { setDocuments(prev => prev.filter(d => d.id !== tempId)); alert("فشل الرفع"); }
         }
@@ -308,7 +308,7 @@ export default function Dashboard() {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:3001/documents/chat', { message: userMsg }, {
+            const res = await api.post('/documents/chat', { message: userMsg }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setChatMessages(prev => [...prev, { role: 'ai', text: res.data.response }]);
@@ -328,7 +328,7 @@ export default function Dashboard() {
         if (!confirm('هل أنت متأكد من حذف هذا المستند؟')) return;
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:3001/documents/${docId}`, { headers: { Authorization: `Bearer ${token}` } });
+            await api.delete(`/documents/${docId}`, { headers: { Authorization: `Bearer ${token}` } });
             setDocuments(prev => prev.filter(d => d.id !== docId));
             setSelectedDoc(null);
         } catch (e) { alert('فشل حذف المستند'); }
@@ -747,7 +747,7 @@ export default function Dashboard() {
         formData.append('category', selectedDocType);
 
         try {
-            await axios.post('http://localhost:3001/documents/upload', formData, {
+            await api.post('/documents/upload', formData, {
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
             });
             fetchDocuments();
@@ -769,7 +769,7 @@ export default function Dashboard() {
     const handleDownload = async (doc: any) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:3001/documents/${doc.id}/download`, {
+            const res = await api.get(`/documents/${doc.id}/download`, {
                 headers: { Authorization: `Bearer ${token}` },
                 responseType: 'blob'
             });

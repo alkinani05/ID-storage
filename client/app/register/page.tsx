@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { Loader2, Mail, Lock, User, ScanLine, Sparkles } from 'lucide-react';
 import Link from 'next/link';
@@ -19,7 +19,7 @@ export default function RegisterPage() {
         setError('');
 
         try {
-            await axios.post('http://localhost:3001/auth/register', formData);
+            await api.post('/auth/register', formData);
             router.push('/login?registered=true');
         } catch (err: any) {
             setError(err.response?.data?.message || 'حدث خطأ ما');

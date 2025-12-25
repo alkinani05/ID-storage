@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import axios from 'axios';
+import api, { API_URL } from '@/lib/api';
 import { motion } from 'framer-motion';
 import { Download, FileText, Loader2, Shield, Sparkles, Printer, Clock, Eye, AlertTriangle } from 'lucide-react';
 
@@ -30,7 +30,7 @@ export default function SharedDocumentPage() {
         if (!token) return;
         const fetchDoc = async () => {
             try {
-                const res = await axios.get(`http://localhost:3001/share/${token}`);
+                const res = await api.get(`/share/${token}`);
                 setDocument(res.data.document);
                 setPermissions(res.data.permissions);
             } catch (err: any) {
@@ -55,7 +55,7 @@ export default function SharedDocumentPage() {
 
         setDownloading(true);
         try {
-            const res = await axios.get(`http://localhost:3001/share/${token}/download`, {
+            const res = await api.get(`/share/${token}/download`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([res.data]));
@@ -164,7 +164,7 @@ export default function SharedDocumentPage() {
                 {document.mimeType?.startsWith('image') && (
                     <div className="mb-8 rounded-2xl overflow-hidden border border-white/10">
                         <img
-                            src={`http://localhost:3001/share/${token}/download`}
+                            src={`${API_URL}/share/${token}/download`}
                             alt={document.title}
                             className="w-full h-auto"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}

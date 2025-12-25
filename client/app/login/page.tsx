@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Mail, Lock, ScanLine, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -20,7 +20,7 @@ function LoginForm() {
         setLoading(true);
         setError('');
         try {
-            const res = await axios.post('http://localhost:3001/auth/login', formData);
+            const res = await api.post('/auth/login', formData);
             localStorage.setItem('token', res.data.accessToken);
             localStorage.setItem('user', JSON.stringify(res.data.user));
             router.push('/dashboard');
