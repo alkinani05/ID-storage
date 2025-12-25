@@ -25,7 +25,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # Install production dependencies
-RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-ara tesseract-ocr-data-eng
+RUN apk add --no-cache openssl libc6-compat tesseract-ocr tesseract-ocr-data-ara tesseract-ocr-data-eng
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
