@@ -1,10 +1,7 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:20 AS builder
 
 WORKDIR /app
-
-# Install dependencies for native modules
-RUN apk add --no-cache python3 make g++ 
 
 # Copy package files
 COPY package*.json ./
@@ -20,20 +17,18 @@ RUN npx prisma generate
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine AS production
+FROM node:20 AS production
 
 WORKDIR /app
 
 # Install production dependencies
-RUN apk add --no-cache openssl libc6-compat tesseract-ocr tesseract-ocr-data-ara tesseract-ocr-data-eng
+RUN apt-get update -y && apt-get install -y openssl tesseract-ocr tesseract-ocr-ara tesseract-ocr-eng
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/prisma ./prisma
-
-# Copy traineddata files
 COPY --from=builder /app/*.traineddata ./
 
 # Set environment variables
@@ -43,4 +38,4 @@ ENV PORT=3001
 EXPOSE 3001
 
 # Run migrations and start
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["npm", "run", "start:prod"]
