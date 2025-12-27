@@ -40,17 +40,18 @@ You need to create **Two Services** in your Railway project: one for the Databas
    - `NIXPACKS_PKGS`: `tesseract-ocr` (Optional, but recommended for robustness)
 5. Railway will detect the changes and deploy.
 6. Once deployed, go to **Settings** -> **Networking** -> **Generate Domain**.
-   - Copy this URL (e.g., `https://server-production.up.railway.app`).
+   - **Backend URL**: `https://id-storage-production-39bf.up.railway.app`
 
 ### Step 3: Deploy Frontend (Client)
 1. Click **"New Service"** -> **GitHub Repo** -> Select your repo (again).
 2. Click the new service card -> **Settings**.
 3. Scroll down to **Root Directory** and set it to: `/client` (Important!).
 4. Go to the **Variables** tab and add:
-   - `NEXT_PUBLIC_API_URL`: (Paste the Backend URL from Step 2)
+   - `NEXT_PUBLIC_API_URL`: `https://id-storage-production-39bf.up.railway.app`
    - `NEXT_PUBLIC_MAX_FILE_SIZE`: `10485760`
 5. Railway will detect Next.js and deploy.
 6. Generate a Domain in **Networking**.
+   - **Frontend URL**: `https://athletic-communication-production.up.railway.app`
 
 ---
 
