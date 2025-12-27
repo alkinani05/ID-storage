@@ -79,6 +79,40 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
             >
+              {/* Test Access Badge - New Addition */}
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="mb-8 p-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-2xl backdrop-blur-md"
+              >
+                <div className="flex items-center gap-4 bg-[#0a0a0f]/80 p-4 rounded-xl">
+                  <div className="flex-shrink-0 w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center animate-pulse">
+                    <Lock className="w-5 h-5 text-yellow-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-yellow-500 uppercase tracking-wider bg-yellow-500/10 px-2 py-0.5 rounded">نسخة تجريبية</span>
+                      <span className="text-xs text-slate-400">حسابات تجريبية جاهزة للاستخدام</span>
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-xs font-mono text-slate-300">
+                      <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded border border-white/5">
+                        <span className="text-slate-500">Admin:</span>
+                        <span className="select-all hover:text-white transition-colors">admin@wathiqni.com</span>
+                        <span className="text-slate-600">|</span>
+                        <span className="select-all hover:text-white transition-colors">admin123</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded border border-white/5">
+                        <span className="text-slate-500">User:</span>
+                        <span className="select-all hover:text-white transition-colors">user@wathiqni.com</span>
+                        <span className="text-slate-600">|</span>
+                        <span className="select-all hover:text-white transition-colors">user123</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
               {/* Badge */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -90,57 +124,57 @@ export default function Home() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span className="text-sm font-medium text-slate-300">نظام ذكي لإدارة الوثائق</span>
+                <span className="text-sm font-medium text-slate-300">الجيل الجديد من إدارة الوثائق</span>
               </motion.div>
 
               {/* Main Heading */}
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-tight mb-6">
-                <span className="block text-white">احفظ وثائقك</span>
-                <span className="block mt-2">
-                  <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">بأمان وذكاء</span>
+              <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black leading-tight mb-6 tracking-tight">
+                <span className="block text-white mb-2">وثائقك الشخصية</span>
+                <span className="block">
+                  <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-gradient-x">في مكان آمن</span>
                 </span>
               </h1>
 
               <p className="text-lg text-slate-400 max-w-xl mb-8 leading-relaxed">
-                منصة متكاملة لحفظ مستنداتك الشخصية والرسمية. مسح ضوئي ذكي، تحليل بالذكاء الاصطناعي، وتنبيهات قبل انتهاء الصلاحية.
+                اختبر قوة الذكاء الاصطناعي في تنظيم حياتك الرقمية. نظام أرشفة متطور يفهم محتوى وثائقك، ينبهك قبل انتهاء صلاحيتها، ويحميها بأعلى معايير التشفير العسكري.
               </p>
 
               {/* CTA Buttons */}
               <div className="flex flex-wrap gap-4">
-                <Link href="/register">
+                <Link href="/login">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className="group bg-white text-slate-900 px-8 py-4 rounded-2xl font-bold text-lg shadow-2xl hover:shadow-white/20 transition-all flex items-center gap-3"
                   >
-                    <span>ابدأ مجاناً</span>
+                    <span>جرب النظام الآن</span>
                     <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
                   </motion.button>
                 </Link>
-                <Link href="/login">
+                <Link href="/register">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="bg-white/5 border border-white/10 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white/10 transition-all"
+                    className="bg-white/5 border border-white/10 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white/10 transition-all backdrop-blur-sm"
                   >
-                    لدي حساب
+                    إنشاء حساب جديد
                   </motion.button>
                 </Link>
               </div>
 
               {/* Trust Indicators */}
-              <div className="flex items-center gap-6 mt-10 text-sm text-slate-500">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-emerald-500" />
-                  <span>مجاني للأبد</span>
+              <div className="flex flex-wrap items-center gap-6 mt-10 text-sm font-medium text-slate-400">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-lg text-emerald-400">
+                  <Shield className="h-4 w-4" />
+                  <span>تشفير AES-256</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-emerald-500" />
-                  <span>بدون بطاقة ائتمان</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 rounded-lg text-blue-400">
+                  <Brain className="h-4 w-4" />
+                  <span>تحليل AI فوري</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-emerald-500" />
-                  <span>دعم عربي</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/10 rounded-lg text-purple-400">
+                  <Globe className="h-4 w-4" />
+                  <span>خوادم محلية</span>
                 </div>
               </div>
             </motion.div>
