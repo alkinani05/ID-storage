@@ -24,7 +24,7 @@ services:
   server:
     build:
       context: ./server
-      dockerfile: Dockerfile.local
+      dockerfile: Dockerfile
     container_name: wathiqati_server
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev}@postgres:5432/${POSTGRES_DB:-wathiqati}
@@ -47,7 +47,7 @@ services:
   client:
     build:
       context: ./client
-      dockerfile: Dockerfile.local
+      dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     container_name: wathiqati_client
