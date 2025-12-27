@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createWorker } from 'tesseract.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import OpenAI from 'openai';
 
 // Sharp for image processing (needs to be installed)
 let sharp: any;
@@ -11,7 +12,7 @@ try {
     console.log('Sharp not available, image analysis will be limited');
 }
 
-interface AIAnalysisResult {
+export interface AIAnalysisResult {
     documentType: 'PASSPORT' | 'ID_CARD' | 'BILL' | 'CERTIFICATE' | 'CONTRACT' | 'RESIDENCE' | 'OTHER';
     confidence: number;
     detectedLanguages: string[];
@@ -28,23 +29,47 @@ interface AIAnalysisResult {
     rawText: string;
 }
 
-interface ColorAnalysis {
-    avgRed: number;
-    avgGreen: number;
-    avgBlue: number;
-    brightness: number;
-    contrast: number;
-    dominantColor: string;
-}
-
 @Injectable()
 export class OcrService {
+    private readonly logger = new Logger(OcrService.name);
+    private openai: OpenAI | null = null;
+
+    constructor() {
+        if (process.env.OPENAI_API_KEY) {
+            this.openai = new OpenAI({
+                apiKey: process.env.OPENAI_API_KEY,
+            });
+            this.logger.log('✅ OpenAI initialized for advanced analysis');
+        } else {
+            this.logger.warn('⚠️ OpenAI API Key not found. Falling back to basic regex analysis.');
+        }
+    }
+
     // Multi-language OCR support
     async parseImage(imagePath: string, languages = 'eng+ara'): Promise<string> {
-        const worker = await createWorker(languages);
-        const ret = await worker.recognize(imagePath);
-        await worker.terminate();
-        return ret.data.text;
+        try {
+            // Check for local traineddata in root app dir
+            const workerConfig: any = {
+                // cachePath: '.',
+                // langPath: '.',
+                gzip: false
+            };
+
+            // Should verify if .traineddata exists locally to avoid re-download
+            if (fs.existsSync(path.join(process.cwd(), 'eng.traineddata'))) {
+                this.logger.log('📂 Using local Tesseract data');
+                workerConfig.langPath = process.cwd();
+                workerConfig.cachePath = process.cwd();
+            }
+
+            const worker = await createWorker(languages, 1, workerConfig);
+            const ret = await worker.recognize(imagePath);
+            await worker.terminate();
+            return ret.data.text;
+        } catch (error) {
+            this.logger.error(`OCR failed for ${imagePath}`, error);
+            throw new Error('OCR process failed');
+        }
     }
 
     // Advanced AI Analysis with multiple detection methods
@@ -67,52 +92,116 @@ export class OcrService {
                 const qualityAnalysis = await this.analyzeImageQuality(imagePath);
                 result.qualityDetails = qualityAnalysis.details;
                 result.qualityScore = qualityAnalysis.score;
-
-                if (qualityAnalysis.score < 50) {
-                    result.suggestions.push('جودة الصورة منخفضة، يُفضل إعادة المسح بإضاءة أفضل');
-                }
-                if (qualityAnalysis.details.brightness < 30) {
-                    result.suggestions.push('الصورة مظلمة جداً');
-                }
-                if (qualityAnalysis.details.brightness > 90) {
-                    result.suggestions.push('الصورة ساطعة جداً');
-                }
+                this.generateQualitySuggestions(result, qualityAnalysis);
             }
 
             // Step 2: OCR with multiple languages
-            const worker = await createWorker('eng+ara');
+            this.logger.debug(`Starting OCR for ${imagePath}`);
+            const workerConfig: any = { gzip: false };
+            if (fs.existsSync(path.join(process.cwd(), 'eng.traineddata'))) {
+                workerConfig.langPath = process.cwd();
+                workerConfig.cachePath = process.cwd();
+            }
+
+            const worker = await createWorker('eng+ara', 1, workerConfig);
             const ret = await worker.recognize(imagePath);
+            await worker.terminate();
             result.rawText = ret.data.text;
 
-            // Detect languages
+            // Detect languages basic check
             const hasArabic = /[\u0600-\u06FF]/.test(result.rawText);
             const hasEnglish = /[a-zA-Z]{3,}/.test(result.rawText);
             if (hasArabic) result.detectedLanguages.push('العربية');
             if (hasEnglish) result.detectedLanguages.push('English');
 
-            await worker.terminate();
-
-            // Step 3: Document Type Detection with AI scoring
-            const typeDetection = this.detectDocumentType(result.rawText);
-            result.documentType = typeDetection.type;
-            result.confidence = typeDetection.confidence;
-
-            // Step 4: Extract fields based on document type
-            result.extractedFields = this.extractFieldsByType(result.rawText, result.documentType);
-
-            // Step 5: Calculate readability score
-            result.qualityDetails.readability = this.calculateReadability(result.rawText);
-
-            // Step 6: Generate AI Summary (Arabic)
-            result.summary = this.generateAISummary(result);
+            // Step 3: Intelligence Layer (OpenAI or Regex Fallback)
+            if (this.openai && result.rawText.length > 50) {
+                await this.enrichWithOpenAI(result);
+            } else {
+                this.enrichWithRegex(result);
+            }
 
         } catch (error) {
-            console.error('AI Analysis Error:', error);
+            this.logger.error('AI Analysis Error:', error);
             result.summary = 'تعذر تحليل المستند بشكل كامل';
             result.suggestions.push('حدث خطأ أثناء التحليل، يرجى المحاولة مرة أخرى');
         }
 
         return result;
+    }
+
+    private enrichWithRegex(result: AIAnalysisResult) {
+        // Fallback: Document Type Detection with AI scoring
+        const typeDetection = this.detectDocumentType(result.rawText);
+        result.documentType = typeDetection.type;
+        result.confidence = typeDetection.confidence;
+
+        // Fallback: Extract fields based on document type
+        result.extractedFields = this.extractFieldsByType(result.rawText, result.documentType);
+
+        // Fallback: Calculate readability score
+        result.qualityDetails.readability = this.calculateReadability(result.rawText);
+
+        // Fallback: Generate AI Summary (Arabic)
+        result.summary = this.generateAISummary(result);
+    }
+
+    private async enrichWithOpenAI(result: AIAnalysisResult) {
+        try {
+            this.logger.debug('Sending text to OpenAI for analysis...');
+            const completion = await this.openai!.chat.completions.create({
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are an expert document analyzer for the "Wathiqni" vault app. 
+                        Analyze the following OCR text. 
+                        Return a pure JSON object (no markdown) with this structure:
+                        {
+                            "documentType": "PASSPORT" | "ID_CARD" | "BILL" | "CERTIFICATE" | "CONTRACT" | "RESIDENCE" | "OTHER",
+                            "confidence": number (0-100),
+                            "extractedFields": {"FieldName": {"value": "extracted value", "confidence": number}},
+                            "summary": "Brief summary in Arabic",
+                            "suggestions": ["suggestion1", "suggestion2"]
+                        }
+                        Focus on extracting keys like Name, ID Number, Expiry Date, Amount (if bill).
+                        For "extractedFields", use Arabic keys mostly.`
+                    },
+                    { role: "user", content: result.rawText }
+                ],
+                model: "gpt-4o-mini",
+                response_format: { type: "json_object" },
+                temperature: 0.3,
+            });
+
+            const aiData = JSON.parse(completion.choices[0].message.content || '{}');
+
+            result.documentType = aiData.documentType || 'OTHER';
+            result.confidence = aiData.confidence || 0;
+            result.extractedFields = aiData.extractedFields || {};
+            result.summary = aiData.summary || this.generateAISummary(result); // Fallback if empty
+            if (aiData.suggestions && Array.isArray(aiData.suggestions)) {
+                result.suggestions = [...result.suggestions, ...aiData.suggestions];
+            }
+
+            // Still calc readability locally as it's a visual stat
+            result.qualityDetails.readability = this.calculateReadability(result.rawText);
+
+        } catch (e) {
+            this.logger.error('OpenAI enrichment failed, falling back to regex', e);
+            this.enrichWithRegex(result);
+        }
+    }
+
+    private generateQualitySuggestions(result: AIAnalysisResult, qualityAnalysis: any) {
+        if (qualityAnalysis.score < 50) {
+            result.suggestions.push('جودة الصورة منخفضة، يُفضل إعادة المسح بإضاءة أفضل');
+        }
+        if (qualityAnalysis.details.brightness < 30) {
+            result.suggestions.push('الصورة مظلمة جداً');
+        }
+        if (qualityAnalysis.details.brightness > 90) {
+            result.suggestions.push('الصورة ساطعة جداً');
+        }
     }
 
     // Image Quality Analysis using Sharp
@@ -151,7 +240,7 @@ export class OcrService {
 
             return { score: Math.min(100, score), details };
         } catch (e) {
-            console.error('Image quality analysis failed:', e);
+            this.logger.error('Image quality analysis failed:', e);
             return { score: 70, details };
         }
     }
@@ -380,7 +469,24 @@ export class OcrService {
     }
 
     // Enhanced AI Chat function
-    async chatWithDoc(query: string, contextText: string) {
+    async chatWithDoc(query: string, contextText: string): Promise<string> {
+        // Use OpenAI if available for superior context answering
+        if (this.openai) {
+            try {
+                const completion = await this.openai.chat.completions.create({
+                    messages: [
+                        { role: "system", content: "You are a helpful assistant for the Wathiqni app. Answer the user's question based ONLY on the provided document context. Answer in Arabic unless asked otherwise." },
+                        { role: "user", content: `Context: ${contextText}\n\nQuestion: ${query}` }
+                    ],
+                    model: "gpt-4o-mini",
+                    temperature: 0.5,
+                });
+                return completion.choices[0].message.content || 'عذراً، لم أتمكن من الإجابة.';
+            } catch (e) {
+                this.logger.error('Chat with OpenAI failed, falling back to regex', e);
+            }
+        }
+
         const q = query.toLowerCase();
         const arabicQ = query;
 
