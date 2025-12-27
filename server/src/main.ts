@@ -12,9 +12,7 @@ async function bootstrap() {
 
         app.enableCors({
             origin: [
-                'http://localhost:3000',
-                'https://athletic-communication-production.up.railway.app',
-                process.env.CORS_ORIGIN
+                process.env.CORS_ORIGIN || '*'
             ].filter(Boolean),
             credentials: true,
             methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
