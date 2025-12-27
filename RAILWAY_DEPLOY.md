@@ -1,11 +1,11 @@
-# 🚀 Deployment Guide: Wathiqati (Railway)
+# 🚀 Deployment Guide:# Wathiqni - Railway Deployment Guide (Docker)
 
-This guide explains how to deploy the **Wathiqati** application to [Railway](https://railway.app) without using Docker (using Native Nixpacks).
+This guide explains how to deploy the **Wathiqni** application to [Railway](https://railway.app/) using **Docker**.
 
-## 1. Preparation (Already Completed)
-
-The codebase has been prepared for Railway:
-- **Dockerfiles** have been renamed to `Dockerfile.local` (ignored by Railway).
+## Prerequisites
+- GitHub account with the `ID-storage` repo.
+- Railway account.
+- **Dockerfiles**: The project uses standard `Dockerfile` configurations for both Client and Server. Railway will automatically detect and use them.
 - **Scripts** have been optimized (`postinstall` added for Prisma).
 - **AI Engine** configured to use local data if no API key is provided.
 
@@ -29,17 +29,15 @@ You need to create **Two Services** in your Railway project: one for the Databas
 3. Keep the **Connection URL** handy (found in the "Connect" tab).
 
 ### Step 2: Deploy Backend (Server)
-1. Click **"New Service"** -> **GitHub Repo** -> Select your repo.
-2. Click the new service card -> **Settings**.
-3. Scroll down to **Root Directory** and set it to: `/server` (Important!).
-4. Go to the **Variables** tab and add:
-   - `DATABASE_URL`: (Paste the PostgreSQL URL from Step 1)
-   - `JWT_SECRET`: (Create a random secure key)
-   - `OPENAI_API_KEY`: (Optional, for advanced AI features. `sk-...`)
+1. On Railway, click **"New Project"** -> **"Deploy from GitHub repo"**.
+2. Select your `ID-storage` repository.
+3. Click **"Variable"** and add:
    - `PORT`: `3001`
-   - `NIXPACKS_PKGS`: `tesseract-ocr` (Optional, but recommended for robustness)
-5. Railway will detect the changes and deploy.
-6. Once deployed, go to **Settings** -> **Networking** -> **Generate Domain**.
+   - `DATABASE_URL`: (Railway provides this automatically if you add a Database service)
+   - `JWT_SECRET`: `your-secret`
+4. **Important**: Go to **Settings** -> **Service** -> **Root Directory** and set it to `/server`.
+   - Railway will detect `server/Dockerfile` and build using Docker.
+5. Generate a Domain in **Networking**.
    - **Backend URL**: `https://id-storage-production-39bf.up.railway.app`
 
 ### Step 3: Deploy Frontend (Client)
