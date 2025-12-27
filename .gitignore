@@ -42,7 +42,6 @@ prisma/*.db-journal
 
 # Uploads (user data)
 server/uploads/
-!server/uploads/.gitkeep
 
 # Testing
 coverage/
