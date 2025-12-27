@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { OcrService } from './ocr.service';
 import * as fs from 'fs';
-import * as path from 'path';
 
 @Injectable()
 export class DocumentsService {
+    private readonly logger = new Logger(DocumentsService.name);
+
     constructor(
         private prisma: PrismaService,
         private ocrService: OcrService,
@@ -50,13 +51,13 @@ export class DocumentsService {
                 return;
             }
 
-            console.log(`🤖 Starting AI analysis for document: ${docId}`);
+            this.logger.log(`Starting AI analysis for document: ${docId}`);
 
             // Run full AI Analysis
             const aiResult = await this.ocrService.analyzeDocument(filePath);
 
-            console.log(`📄 AI Detection: ${aiResult.documentType} (${aiResult.confidence}% confidence)`);
-            console.log(`📊 Quality Score: ${aiResult.qualityScore}%`);
+            this.logger.log(`AI Detection: ${aiResult.documentType} (${aiResult.confidence}% confidence)`);
+            this.logger.debug(`Quality Score: ${aiResult.qualityScore}%`);
 
             // Parse expiry date if found
             let expiryDate: Date | null = null;
@@ -69,7 +70,9 @@ export class DocumentsService {
                     } else if (parseInt(parts[0]) > 2000) {
                         expiryDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
                     }
-                } catch (e) { /* ignore parsing errors */ }
+                } catch {
+                    // Date parsing failed - expiry date will remain null
+                }
             }
 
             // Update Document with AI results
@@ -146,10 +149,10 @@ export class DocumentsService {
                 });
             }
 
-            console.log(`✅ AI Analysis complete for document: ${docId}`);
+            this.logger.log(`AI Analysis complete for document: ${docId}`);
 
         } catch (e) {
-            console.error('❌ AI Analysis failed:', e);
+            this.logger.error(`AI Analysis failed for document ${docId}:`, e);
             await this.prisma.document.update({
                 where: { id: docId },
                 data: { status: 'FAILED' },
@@ -244,7 +247,7 @@ export class DocumentsService {
                 fs.unlinkSync(doc.r2Key);
             }
         } catch (e) {
-            console.error('Failed to delete file from disk', e);
+            this.logger.warn('Failed to delete file from disk', e);
         }
 
         return { success: true, message: 'Document deleted' };
@@ -288,7 +291,7 @@ export class DocumentsService {
                 response = "مرحباً بك! أنا مساعدك الذكي في وثيقتي. كيف يمكنني مساعدتك اليوم؟";
             }
         } catch (e) {
-            console.error(e);
+            this.logger.error('Chat processing error', e);
             response = "حدث خطأ أثناء معالجة طلبك.";
         }
 

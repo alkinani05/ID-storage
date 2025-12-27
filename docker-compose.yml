@@ -65,7 +65,6 @@ volumes:
   postgres_data:
   uploads_data:
 
-
 networks:
   wathiqati_net:
     driver: bridge

@@ -9,7 +9,7 @@ let sharp: any;
 try {
     sharp = require('sharp');
 } catch (e) {
-    console.log('Sharp not available, image analysis will be limited');
+    // Sharp not available - handled in OcrService constructor
 }
 
 export interface AIAnalysisResult {
