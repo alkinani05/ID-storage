@@ -16,8 +16,14 @@ async function bootstrap() {
         console.log('NestJS application created');
 
         app.enableCors({
-            origin: process.env.CORS_ORIGIN || '*',
+            origin: [
+                'http://localhost:3000',
+                'https://athletic-communication-production.up.railway.app',
+                process.env.CORS_ORIGIN
+            ].filter(Boolean),
             credentials: true,
+            methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+            allowedHeaders: 'Content-Type, Accept, Authorization',
         });
         console.log('CORS enabled');
 
