@@ -1,6 +1,7 @@
 # وثقني - Wathiqni Document Vault
 
 
+
 <div align="center">
 
 ![وثقني](https://img.shields.io/badge/وثقني-Document%20Vault-blue?style=for-the-badge)
@@ -9,8 +10,6 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue?style=flat-square&logo=postgresql)
 
 **AI-Powered Personal Document Vault | خزنة الوثائق الذكية**
-
-[🚀 **Live Demo**](https://athletic-communication-production.up.railway.app) | [⚙️ **Backend API**](https://id-storage-production-39bf.up.railway.app/health)
 
 </div>
 
