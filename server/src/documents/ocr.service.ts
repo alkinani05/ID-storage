@@ -48,6 +48,12 @@ export class OcrService {
     // Multi-language OCR support
     async parseImage(imagePath: string, languages = 'eng+ara'): Promise<string> {
         try {
+            // Verify file exists before processing
+            if (!fs.existsSync(imagePath)) {
+                this.logger.error(`Image file not found: ${imagePath}`);
+                throw new Error(`Image file not found: ${imagePath}`);
+            }
+
             // Check for local traineddata in root app dir
             const workerConfig: any = {
                 // cachePath: '.',
@@ -56,18 +62,37 @@ export class OcrService {
             };
 
             // Should verify if .traineddata exists locally to avoid re-download
-            if (fs.existsSync(path.join(process.cwd(), 'eng.traineddata'))) {
+            const localTrainedDataPath = path.join(process.cwd(), 'eng.traineddata');
+            if (fs.existsSync(localTrainedDataPath)) {
                 this.logger.log('📂 Using local Tesseract data');
                 workerConfig.langPath = process.cwd();
                 workerConfig.cachePath = process.cwd();
+            } else {
+                this.logger.warn('⚠️ Local Tesseract data not found, will download from CDN');
             }
 
+            this.logger.debug(`Creating Tesseract worker for languages: ${languages}`);
             const worker = await createWorker(languages, 1, workerConfig);
+
+            this.logger.debug(`Recognizing text from: ${imagePath}`);
             const ret = await worker.recognize(imagePath);
+
             await worker.terminate();
+            this.logger.debug(`OCR completed successfully, extracted ${ret.data.text.length} characters`);
+
             return ret.data.text;
         } catch (error) {
             this.logger.error(`OCR failed for ${imagePath}`, error);
+
+            // Provide more specific error messages
+            if (error.message?.includes('ENOENT')) {
+                throw new Error('OCR process failed: Image file not accessible');
+            } else if (error.message?.includes('traineddata')) {
+                throw new Error('OCR process failed: Tesseract language data not available');
+            } else if (error.message?.includes('worker')) {
+                throw new Error('OCR process failed: Unable to initialize Tesseract worker');
+            }
+
             throw new Error('OCR process failed');
         }
     }
