@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import api, { API_URL } from '@/lib/api';
 import { motion } from 'framer-motion';
 import { Download, FileText, Loader2, Shield, Sparkles, Printer, Clock, Eye, AlertTriangle } from 'lucide-react';
@@ -17,9 +17,9 @@ interface Permissions {
     maxViews: number | null;
 }
 
-export default function SharedDocumentPage() {
-    const params = useParams();
-    const token = params?.token as string;
+function ShareContent() {
+    const searchParams = useSearchParams();
+    const token = searchParams.get('token');
     const [document, setDocument] = useState<any>(null);
     const [permissions, setPermissions] = useState<Permissions | null>(null);
     const [loading, setLoading] = useState(true);
@@ -27,7 +27,11 @@ export default function SharedDocumentPage() {
     const [downloading, setDownloading] = useState(false);
 
     useEffect(() => {
-        if (!token) return;
+        if (!token) {
+            setError('رابط غير صالح (مفقود الرمز)');
+            setLoading(false);
+            return;
+        }
         const fetchDoc = async () => {
             try {
                 const res = await api.get(`/share/${token}`);
@@ -229,5 +233,17 @@ export default function SharedDocumentPage() {
                 )}
             </motion.div>
         </div>
+    );
+}
+
+export default function SharedDocumentPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+                <Loader2 className="h-10 w-10 animate-spin text-purple-500" />
+            </div>
+        }>
+            <ShareContent />
+        </Suspense>
     );
 }
