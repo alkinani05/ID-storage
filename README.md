@@ -82,28 +82,20 @@ npm run dev
 - Frontend: http://localhost:3002
 - Backend: http://localhost:3001
 
-## 🌐 Deploy to Railway
+## 🚀 Deployment
 
-1. Create account at [railway.app](https://railway.app)
-2. Connect your GitHub repository
-3. Add PostgreSQL service
-4. Deploy backend service (from `/server`)
-5. Deploy frontend service (from `/client`)
-6. Configure environment variables
+The project is deployed using **Firebase Hosting**.
 
-### Environment Variables
+### Live Demo
+[https://wathiqni-vault-husam05.web.app](https://wathiqni-vault-husam05.web.app)
+*(Demo Mode: Uses simulated backend)*
 
-**Backend (server)**
-```
-DATABASE_URL=<railway-postgres-url>
-JWT_SECRET=<your-secret-key>
-PORT=3001
-CORS_ORIGIN=<frontend-url>
-```
-
-**Frontend (client)**
-```
-NEXT_PUBLIC_API_URL=<backend-url>
+### Deploy Updates
+To update the live site:
+```bash
+cd client
+npm run build
+firebase deploy --only hosting
 ```
 
 ## 📁 Project Structure
