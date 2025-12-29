@@ -2,7 +2,6 @@ import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-
 const api = axios.create({
     baseURL: API_URL,
     headers: {
@@ -23,10 +22,6 @@ api.interceptors.request.use(async (config) => {
                 (email === 'admin@wathiqni.com' && password === 'admin123') ||
                 (email === 'user@wathiqni.com' && password === 'user123')
             ) {
-                // Throw a "success" error to be caught by the response interceptor or just return a promise that resolves
-                // Axios adapters are the "proper" way but intercepting the *request* and returning a response object specifically 
-                // via an adapter is cleaner. But we can't easily swap adapters here dynamically without complexity.
-                // EASIEST WAY: Force the adapter for this specific request info.
                 config.adapter = async () => {
                     return {
                         data: {
@@ -87,11 +82,42 @@ api.interceptors.request.use(async (config) => {
             };
         }
 
+        // Mock Upload
+        if (config.url?.includes('/documents/upload') && config.method === 'post') {
+            config.adapter = async () => {
+                return {
+                    data: {
+                        id: Math.random().toString(),
+                        title: 'مستند جديد',
+                        status: 'PROCESSED',
+                        message: 'تم الرفع (محاكاة)'
+                    },
+                    status: 201,
+                    statusText: 'Created',
+                    headers: {},
+                    config
+                };
+            };
+        }
+
+        // Mock Delete
+        if (config.url?.startsWith('/documents/') && config.method === 'delete') {
+            config.adapter = async () => {
+                return {
+                    data: { success: true, message: 'تم الحذف (محاكاة)' },
+                    status: 200,
+                    statusText: 'OK',
+                    headers: {},
+                    config
+                };
+            };
+        }
+
         // Mock Stats or other gets
         if (config.method === 'get') {
             config.adapter = async () => {
                 return {
-                    data: [], // Default empty array or object
+                    data: [],
                     status: 200,
                     statusText: 'OK',
                     headers: {},
