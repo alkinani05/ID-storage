@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, usePathname } from 'next/navigation';
 import api, { API_URL } from '@/lib/api';
 import { motion } from 'framer-motion';
 import { Download, FileText, Loader2, Shield, Sparkles, Printer, Clock, Eye, AlertTriangle } from 'lucide-react';
@@ -19,7 +19,19 @@ interface Permissions {
 
 function ShareContent() {
     const searchParams = useSearchParams();
-    const token = searchParams.get('token');
+    const pathname = usePathname();
+
+    // Support both query param (?token=XYZ) and path (/share/XYZ)
+    let token = searchParams.get('token');
+    if (!token && pathname) {
+        // format: /share/XYZ
+        const parts = pathname.split('/');
+        const shareIndex = parts.indexOf('share');
+        if (shareIndex !== -1 && shareIndex + 1 < parts.length) {
+            token = parts[shareIndex + 1];
+        }
+    }
+
     const [document, setDocument] = useState<any>(null);
     const [permissions, setPermissions] = useState<Permissions | null>(null);
     const [loading, setLoading] = useState(true);
@@ -35,9 +47,16 @@ function ShareContent() {
         const fetchDoc = async () => {
             try {
                 const res = await api.get(`/share/${token}`);
+                console.log('=== Share Document Data ===');
+                console.log('Document:', res.data.document);
+                console.log('Permissions:', res.data.permissions);
+                console.log('Title:', res.data.document?.title);
+                console.log('Category:', res.data.document?.category);
+                console.log('File URL:', res.data.document?.fileUrl);
                 setDocument(res.data.document);
                 setPermissions(res.data.permissions);
             } catch (err: any) {
+                console.error('Share fetch error:', err);
                 const msg = err.response?.data?.message || 'هذا الرابط غير صالح أو انتهت صلاحيته.';
                 setError(msg);
             } finally {
@@ -129,7 +148,7 @@ function ShareContent() {
                     <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30 print:hidden">
                         <FileText className="h-8 w-8 text-white" />
                     </div>
-                    <h1 className="text-3xl font-black mb-2 print:text-black">{document.title}</h1>
+                    <h1 className="text-3xl font-black mb-2 print:text-black">{document?.title || 'مستند بدون عنوان'}</h1>
                     <p className="text-slate-400 print:text-gray-600">تمت مشاركة هذا المستند معك عبر وثقني</p>
                 </div>
 
@@ -138,11 +157,11 @@ function ShareContent() {
                     <div className="flex flex-wrap gap-2 justify-center mb-6 print:hidden">
                         <div className="flex items-center gap-1 px-3 py-1.5 bg-slate-800/50 rounded-full text-xs">
                             <Clock className="h-3 w-3 text-blue-400" />
-                            <span>ينتهي خلال: {formatExpiry(permissions.expiresAt)}</span>
+                            <span>ينتهي خلال: {permissions.expiresAt ? formatExpiry(permissions.expiresAt) : 'غير محدود'}</span>
                         </div>
                         <div className="flex items-center gap-1 px-3 py-1.5 bg-slate-800/50 rounded-full text-xs">
                             <Eye className="h-3 w-3 text-purple-400" />
-                            <span>المشاهدات: {permissions.viewsCount}{permissions.maxViews ? `/${permissions.maxViews}` : ''}</span>
+                            <span>المشاهدات: {permissions.viewsCount || 0}{permissions.maxViews ? `/${permissions.maxViews}` : ''}</span>
                         </div>
                         {permissions.oneTimeDownload && !permissions.downloadUsed && (
                             <div className="flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 rounded-full text-xs text-orange-400">
@@ -156,33 +175,56 @@ function ShareContent() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                     <div className="bg-slate-800/50 p-4 rounded-2xl border border-white/5 print:border-gray-300">
                         <p className="text-slate-500 text-sm mb-1 print:text-gray-500">النوع</p>
-                        <p className="font-bold text-lg print:text-black">{document.category}</p>
+                        <p className="font-bold text-lg print:text-black">{document?.category || 'غير محدد'}</p>
                     </div>
                     <div className="bg-slate-800/50 p-4 rounded-2xl border border-white/5 print:border-gray-300">
                         <p className="text-slate-500 text-sm mb-1 print:text-gray-500">الحجم</p>
-                        <p className="font-bold text-lg print:text-black">{(document.size / 1024).toFixed(1)} KB</p>
+                        <p className="font-bold text-lg print:text-black">{document?.size ? (document.size / 1024).toFixed(1) : '0'} KB</p>
                     </div>
                 </div>
 
                 {/* Document Preview for Images */}
-                {document.mimeType?.startsWith('image') && (
-                    <div className="mb-8 rounded-2xl overflow-hidden border border-white/10">
+                {document?.mimeType?.startsWith('image') && document?.fileUrl && (
+                    <div className="mb-8 rounded-2xl overflow-hidden border border-white/10 print:border-gray-300">
                         <img
-                            src={`${API_URL}/share/${token}/download`}
-                            alt={document.title}
+                            src={`${API_URL}${document.fileUrl}`}
+                            alt={document.title || 'Document preview'}
                             className="w-full h-auto"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            onError={(e) => { 
+                                (e.target as HTMLImageElement).style.display = 'none';
+                                console.error('Failed to load image');
+                            }}
                         />
                     </div>
                 )}
 
-                {document.extractedData?.length > 0 && (
+                {/* Document Preview for PDFs */}
+                {document?.mimeType === 'application/pdf' && document?.fileUrl && (
+                    <div className="mb-8 rounded-2xl overflow-hidden border border-white/10 print:hidden">
+                        <iframe
+                            src={`${API_URL}${document.fileUrl}`}
+                            className="w-full h-96"
+                            title="PDF Preview"
+                        />
+                    </div>
+                )}
+
+                {document?.extractedData?.length > 0 && (
                     <div className="bg-gradient-to-r from-blue-600/10 to-purple-600/10 border border-purple-500/20 rounded-2xl p-6 mb-8 print:bg-gray-100">
                         <div className="flex items-center gap-2 mb-3">
                             <Sparkles className="h-5 w-5 text-purple-400 print:text-purple-600" />
                             <span className="font-bold text-purple-200 print:text-purple-800">البيانات المستخرجة</span>
                         </div>
-                        <p className="text-slate-300 leading-relaxed print:text-gray-700">{document.extractedData[0].fieldValue}</p>
+                        <div className="text-slate-300 leading-relaxed print:text-gray-700 space-y-2">
+                            {document.extractedData
+                                .filter((item: any) => item.fieldName === 'ai_summary')
+                                .map((item: any, idx: number) => (
+                                    <p key={idx} className="whitespace-pre-wrap">{item.fieldValue}</p>
+                                ))}
+                            {!document.extractedData.some((item: any) => item.fieldName === 'ai_summary') && (
+                                <p>{document.extractedData[0]?.fieldValue || 'لا توجد تفاصيل'}</p>
+                            )}
+                        </div>
                     </div>
                 )}
 

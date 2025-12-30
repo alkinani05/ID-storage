@@ -44,11 +44,10 @@
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 20+
-- PostgreSQL 16+
-- Docker (optional)
+- Docker and Docker Compose
+- Git
 
-### Local Development
+### Local Deployment with Docker
 
 1. **Clone the repository**
 ```bash
@@ -56,47 +55,59 @@ git clone https://github.com/alkinani05/ID-storage.git
 cd ID-storage
 ```
 
-2. **Start PostgreSQL with Docker**
+2. **Configure environment**
 ```bash
-docker-compose up -d postgres
+cp .env.example .env
+# Edit .env with your settings (see LOCAL_SETUP.md for details)
 ```
 
-3. **Setup Backend**
+3. **Start all services**
+```bash
+chmod +x test-local.sh
+./test-local.sh
+```
+
+Or manually:
+```bash
+docker compose up --build -d
+```
+
+4. **Access the application**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:3001
+- Health Check: http://localhost:3001/health
+
+### Development Mode (Without Docker)
+
+1. **Start PostgreSQL**
+```bash
+docker compose up postgres -d
+```
+
+2. **Setup Backend**
 ```bash
 cd server
 npm install
 cp .env.example .env
-# Edit .env with your database URL
+# Edit DATABASE_URL in .env
 npx prisma migrate dev
 npm run start:dev
 ```
 
-4. **Setup Frontend**
+3. **Setup Frontend**
 ```bash
 cd client
 npm install
+cp env.example .env.local
+# Edit NEXT_PUBLIC_API_URL in .env.local
 npm run dev
 ```
 
-5. **Open in browser**
-- Frontend: http://localhost:3002
-- Backend: http://localhost:3001
+## 📖 Documentation
 
-## 🚀 Deployment
-
-The project is deployed using **Firebase Hosting**.
-
-### Live Demo
-[https://wathiqni-vault-husam05.web.app](https://wathiqni-vault-husam05.web.app)
-*(Demo Mode: Uses simulated backend)*
-
-### Deploy Updates
-To update the live site:
-```bash
-cd client
-npm run build
-firebase deploy --only hosting
-```
+- **[LOCAL_SETUP.md](LOCAL_SETUP.md)** - Comprehensive local setup guide
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick command reference
+- **[PROJECT_PLAN.md](PROJECT_PLAN.md)** - Project architecture and planning
 
 ## 📁 Project Structure
 

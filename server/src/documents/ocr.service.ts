@@ -112,12 +112,22 @@ export class OcrService {
         };
 
         try {
-            // Step 1: Image Quality Analysis
+            // Step 1: Image Quality Analysis & Pre-processing
+            let imageToProcess = imagePath;
             if (sharp && fs.existsSync(imagePath)) {
                 const qualityAnalysis = await this.analyzeImageQuality(imagePath);
                 result.qualityDetails = qualityAnalysis.details;
                 result.qualityScore = qualityAnalysis.score;
                 this.generateQualitySuggestions(result, qualityAnalysis);
+
+                // Pre-process image for better OCR accuracy
+                try {
+                    const processedBuffer = await this.preprocessImage(imagePath);
+                    imageToProcess = processedBuffer as any; // Tesseract accepts Buffer
+                    this.logger.debug('Image pre-processing completed');
+                } catch (e) {
+                    this.logger.warn('Image pre-processing failed, using original image', e);
+                }
             }
 
             // Step 2: OCR with multiple languages
@@ -129,7 +139,7 @@ export class OcrService {
             }
 
             const worker = await createWorker('eng+ara', 1, workerConfig);
-            const ret = await worker.recognize(imagePath);
+            const ret = await worker.recognize(imageToProcess);
             await worker.terminate();
             result.rawText = ret.data.text;
 
@@ -229,6 +239,18 @@ export class OcrService {
         }
     }
 
+    // Pre-process image for OCR optimization
+    private async preprocessImage(imagePath: string): Promise<Buffer> {
+        if (!sharp) throw new Error('Sharp not available');
+
+        return sharp(imagePath)
+            .resize(2000, 2000, { fit: 'inside', withoutEnlargement: false }) // Ensure decent size
+            .grayscale() // Remove color noise
+            .normalize() // Improve contrast
+            .sharpen() // Sharpen edges
+            .toBuffer();
+    }
+
     // Image Quality Analysis using Sharp
     private async analyzeImageQuality(imagePath: string): Promise<{ score: number; details: AIAnalysisResult['qualityDetails'] }> {
         const details = { brightness: 70, contrast: 70, sharpness: 70, readability: 70 };
@@ -277,11 +299,11 @@ export class OcrService {
 
         const patterns = {
             PASSPORT: {
-                keywords: ['passport', 'جواز', 'سفر', 'nationality', 'الجنسية', 'republic', 'الجمهورية', 'ministry', 'وزارة'],
+                keywords: ['passport', 'جواز', 'سفر', 'nationality', 'الجنسية', 'republic of iraq', 'جمهورية العراق', 'P<IRQ', 'type p'],
                 weight: 0
             },
             ID_CARD: {
-                keywords: ['national id', 'identity', 'هوية', 'بطاقة', 'national number', 'الرقم الوطني', 'civil', 'مدني'],
+                keywords: ['national id', 'identity', 'هوية', 'بطاقة', 'national number', 'الرقم الوطني', 'civil', 'مدني', 'unified card', 'البطاقة الوطنية', 'id card'],
                 weight: 0
             },
             RESIDENCE: {
@@ -337,24 +359,21 @@ export class OcrService {
         // Common patterns
         const patterns = {
             email: /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/,
-            phone: /(\+?[0-9]{10,14})/,
             date: /\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b/g,
             idNumber: /\b\d{8,14}\b/,
             arabicName: /([أ-ي\s]{3,30})/,
             englishName: /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/,
             amount: /(?:[\$€¥£]|IQD|USD|EUR)?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/,
+            // Iraqi Specific
+            iraqiPassport: /[A-Z]\d{7,9}/,
+            iraqiNationalId: /\d{12}/,
+            familyNumber: /[A-Z0-9]{10,20}/
         };
 
         // Extract email
         const emailMatch = text.match(patterns.email);
         if (emailMatch) {
             fields['البريد الإلكتروني'] = { value: emailMatch[0], confidence: 90 };
-        }
-
-        // Extract phone
-        const phoneMatch = text.match(patterns.phone);
-        if (phoneMatch) {
-            fields['رقم الهاتف'] = { value: phoneMatch[0], confidence: 85 };
         }
 
         // Extract dates
@@ -385,19 +404,68 @@ export class OcrService {
             }
         }
 
-        // Extract ID number
-        const idMatch = text.match(patterns.idNumber);
-        if (idMatch) {
-            fields['رقم المستند'] = { value: idMatch[0], confidence: 85 };
-        }
-
-        // Extract names
-        const englishNameMatch = text.match(patterns.englishName);
-        if (englishNameMatch) {
-            fields['الاسم (إنجليزي)'] = { value: englishNameMatch[0].trim(), confidence: 70 };
-        }
-
         // Type-specific extractions
+        if (docType === 'PASSPORT') {
+            // Full MRZ Parsing
+            const mrzData = this.parseMRZ(text);
+            if (mrzData) {
+                if (mrzData.documentNumber) fields['رقم الجواز'] = { value: mrzData.documentNumber, confidence: 98 };
+                if (mrzData.surname) fields['اللقب (MRZ)'] = { value: mrzData.surname, confidence: 95 };
+                if (mrzData.names) fields['الاسم (MRZ)'] = { value: mrzData.names, confidence: 95 };
+                if (mrzData.nationality) fields['الجنسية (Code)'] = { value: mrzData.nationality, confidence: 95 };
+                if (mrzData.birthDate) fields['تاريخ الميلاد'] = { value: mrzData.birthDate, confidence: 95 };
+                if (mrzData.expiryDate) fields['تاريخ الانتهاء'] = { value: mrzData.expiryDate, confidence: 95 };
+                if (mrzData.sex) fields['الجنس'] = { value: mrzData.sex, confidence: 95 };
+                if (mrzData.personalNumber) fields['الرقم الشخصي'] = { value: mrzData.personalNumber, confidence: 90 };
+            } else {
+                // Fallback if MRZ parse fails
+                const passportMatch = text.match(patterns.iraqiPassport);
+                if (passportMatch) {
+                    fields['رقم الجواز'] = { value: passportMatch[0], confidence: 90 };
+                }
+            }
+        }
+
+        if (docType === 'ID_CARD') {
+            // Try MRZ for ID Card (Type 1 - 3 lines)
+            const mrzData = this.parseMRZ(text);
+            if (mrzData) {
+                 if (mrzData.documentNumber) fields['رقم المستند'] = { value: mrzData.documentNumber, confidence: 98 };
+                 if (mrzData.birthDate) fields['تاريخ الميلاد'] = { value: mrzData.birthDate, confidence: 95 };
+                 if (mrzData.expiryDate) fields['تاريخ الانتهاء'] = { value: mrzData.expiryDate, confidence: 95 };
+            }
+
+            // Iraqi National ID (12 digits)
+            const nidMatch = text.match(patterns.iraqiNationalId);
+            if (nidMatch) {
+                fields['الرقم الوطني'] = { value: nidMatch[0], confidence: 95 };
+            }
+
+            // Family Number (often alphanumeric on back)
+            if (text.includes('الرقم العائلي') || text.includes('Family No')) {
+                const famMatch = text.match(/\d{8,}/); // Simplified
+                if (famMatch) {
+                    fields['الرقم العائلي'] = { value: famMatch[0], confidence: 80 };
+                }
+            }
+        }
+
+        // Fallback ID extraction
+        if (!fields['رقم الجواز'] && !fields['الرقم الوطني']) {
+            const idMatch = text.match(patterns.idNumber);
+            if (idMatch) {
+                fields['رقم المستند'] = { value: idMatch[0], confidence: 85 };
+            }
+        }
+
+        // Extract names (Generic)
+        if (!fields['الاسم (MRZ)']) {
+            const englishNameMatch = text.match(patterns.englishName);
+            if (englishNameMatch) {
+                fields['الاسم (إنجليزي)'] = { value: englishNameMatch[0].trim(), confidence: 70 };
+            }
+        }
+
         if (docType === 'BILL') {
             const amountMatch = text.match(patterns.amount);
             if (amountMatch) {
@@ -423,6 +491,83 @@ export class OcrService {
         }
 
         return fields;
+    }
+
+    // Parse MRZ (Machine Readable Zone)
+    private parseMRZ(text: string): any {
+        // Clean text: remove spaces, newlines, keep only A-Z, 0-9, <
+        const lines = text.split('\n').map(l => l.trim().replace(/[^A-Z0-9<]/g, '')).filter(l => l.length > 30);
+        
+        // Type 3 (Passport): 2 lines of 44 chars
+        // Line 1: P<IRQSURNAME<<GIVEN<NAMES<<<<<<<<<<<<<<<<<<<
+        // Line 2: A123456784IRQ8001018M2501015<<<<<<<<<<<<<<02
+        
+        // Find Line 1 (Starts with P<, I<, A<, C<)
+        const line1Idx = lines.findIndex(l => /^[PIAC]<[A-Z<]{3}/.test(l) && l.length >= 40);
+        if (line1Idx === -1 || line1Idx + 1 >= lines.length) return null;
+
+        const line1 = lines[line1Idx];
+        const line2 = lines[line1Idx + 1];
+
+        // Basic parsing for Type 3 (Passport)
+        if (line1.startsWith('P')) {
+            const type = line1.substring(0, 2); // P<
+            const country = line1.substring(2, 5); // IRQ
+            const names = line1.substring(5).split('<<');
+            const surname = names[0].replace(/</g, ' ').trim();
+            const givenNames = names.length > 1 ? names[1].replace(/</g, ' ').trim() : '';
+
+            const docNumber = line2.substring(0, 9).replace(/</g, '');
+            const nationality = line2.substring(10, 13);
+            const dob = line2.substring(13, 19); // YYMMDD
+            const sex = line2.substring(20, 21);
+            const expiry = line2.substring(21, 27); // YYMMDD
+            const personalNumber = line2.substring(28, 42).replace(/</g, '');
+
+            return {
+                type,
+                country,
+                surname,
+                names: givenNames,
+                documentNumber: docNumber,
+                nationality,
+                birthDate: this.parseMRZDate(dob),
+                sex,
+                expiryDate: this.parseMRZDate(expiry),
+                personalNumber
+            };
+        }
+        
+        // Type 1 (ID Card): 3 lines of 30 chars
+        // I<IRQ...
+        if (line1.startsWith('I') || line1.startsWith('A') || line1.startsWith('C')) {
+             const docNumber = line1.substring(5, 14).replace(/</g, '');
+             // Note: ID Card MRZ parsing is more complex and varies, this is a basic attempt
+             // Line 2 usually has DOB: YYMMDD
+             const dob = line2.substring(0, 6);
+             const sex = line2.substring(7, 8);
+             const expiry = line2.substring(8, 14);
+             
+             return {
+                 documentNumber: docNumber,
+                 birthDate: this.parseMRZDate(dob),
+                 sex,
+                 expiryDate: this.parseMRZDate(expiry)
+             };
+        }
+
+        return null;
+    }
+
+    private parseMRZDate(yymmdd: string): string {
+        if (!/^\d{6}$/.test(yymmdd)) return yymmdd;
+        const yy = parseInt(yymmdd.substring(0, 2));
+        const mm = yymmdd.substring(2, 4);
+        const dd = yymmdd.substring(4, 6);
+        
+        // Pivot year for 20th/21st century (simple heuristic)
+        const year = yy > 50 ? `19${yy}` : `20${yy}`;
+        return `${year}-${mm}-${dd}`;
     }
 
     // Calculate text readability score

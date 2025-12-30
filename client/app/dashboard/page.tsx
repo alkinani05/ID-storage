@@ -175,15 +175,18 @@ export default function Dashboard() {
         setShareLoading(true);
         try {
             const token = localStorage.getItem('token');
+            const docToShare = documents.find(d => d.id === shareDocId);
             const res = await api.post(`/documents/${shareDocId}/share`, {
                 expiryHours: shareExpiry,
                 allowDownload: shareAllowDownload,
                 allowPrint: shareAllowPrint,
                 oneTimeDownload: shareOneTime,
-                maxViews: shareMaxViews
+                maxViews: shareMaxViews,
+                // Pass category for Smart Token generation in Demo
+                docCategory: docToShare?.category || 'OTHER'
             }, { headers: { Authorization: `Bearer ${token}` } });
 
-            const link = `${window.location.origin}/share/${res.data.token}`;
+            const link = `${window.location.origin}/share?token=${res.data.token}`;
             setGeneratedShareLink(link);
             navigator.clipboard.writeText(link);
             fetchDocuments(); // Refresh to show new share
@@ -1202,9 +1205,32 @@ export default function Dashboard() {
             <AnimatePresence>
                 {
                     selectedDoc && (
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8" onClick={() => setSelectedDoc(null)}>
-                            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} onClick={e => e.stopPropagation()} className="bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[80vh] overflow-auto border border-white/10">
-                                <div className="p-8">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-8" onClick={() => setSelectedDoc(null)}>
+                            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} onClick={e => e.stopPropagation()} className="bg-slate-900 rounded-3xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-white/10 flex flex-col md:flex-row">
+                                
+                                {/* Left Side: Image Preview */}
+                                <div className="w-full md:w-1/2 bg-black/50 p-6 flex items-center justify-center border-b md:border-b-0 md:border-l border-white/10 relative">
+                                    {selectedDoc.id && (selectedDoc.category === 'PASSPORT' || selectedDoc.category === 'ID_CARD' || selectedDoc.mimeType?.startsWith('image')) ? (
+                                        <div className="relative w-full h-full flex items-center justify-center">
+                                            <img
+                                                src={`http://localhost:3001/documents/${selectedDoc.id}/download?token=${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}`}
+                                                alt={selectedDoc.title}
+                                                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+                                            />
+                                            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs text-white/80 border border-white/10">
+                                                معاينة المستند الأصلي
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-slate-500">
+                                            <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                                            <p>لا تتوفر معاينة لهذا الملف</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Right Side: Details & Data */}
+                                <div className="w-full md:w-1/2 overflow-y-auto p-6 md:p-8 bg-slate-900">
                                     <div className="flex justify-between items-start mb-6">
                                         <div>
                                             <h2 className="text-2xl font-black mb-2">{selectedDoc.title}</h2>
@@ -1217,15 +1243,6 @@ export default function Dashboard() {
                                         <div className="bg-slate-800/50 rounded-xl p-4"><p className="text-sm text-slate-400 mb-1">النوع</p><p className="font-bold">{selectedDoc.category}</p></div>
                                     </div>
 
-                                    {selectedDoc.id && (selectedDoc.category === 'PASSPORT' || selectedDoc.category === 'ID_CARD' || selectedDoc.mimeType?.startsWith('image')) && (
-                                        <div className="mb-6 rounded-xl overflow-hidden border border-white/10">
-                                            <img
-                                                src={`http://localhost:3001/documents/${selectedDoc.id}/download?token=${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}`}
-                                                alt={selectedDoc.title}
-                                                className="w-full h-auto object-cover"
-                                            />
-                                        </div>
-                                    )}
                                     {selectedDoc.extractedData?.length > 0 && (
                                         <div className="space-y-4">
                                             {/* AI Summary */}
@@ -1297,11 +1314,12 @@ export default function Dashboard() {
                                                                         <span className="text-sm text-slate-400">{field.fieldName}</span>
                                                                         <div className="flex items-center gap-2">
                                                                             <span className="text-sm font-medium">{field.fieldValue}</span>
-                                                                            <span className={cn("text-xs px-1.5 py-0.5 rounded",
-                                                                                field.confidence >= 0.8 ? "bg-emerald-500/20 text-emerald-400" :
-                                                                                    field.confidence >= 0.6 ? "bg-yellow-500/20 text-yellow-400" :
-                                                                                        "bg-red-500/20 text-red-400"
+                                                                            <span className={cn("text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1",
+                                                                                field.confidence >= 0.8 ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
+                                                                                    field.confidence >= 0.6 ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30" :
+                                                                                        "bg-red-500/20 text-red-400 border border-red-500/30"
                                                                             )}>
+                                                                                {field.confidence >= 0.8 ? <CheckCircle className="w-3 h-3" /> : field.confidence >= 0.6 ? <AlertCircle className="w-3 h-3" /> : <X className="w-3 h-3" />}
                                                                                 {Math.round(field.confidence * 100)}%
                                                                             </span>
                                                                         </div>
@@ -1399,7 +1417,7 @@ export default function Dashboard() {
                                                         initial={{ top: 0 }}
                                                         animate={{ top: ['0%', '100%', '0%'] }}
                                                         transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                                                        className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent"
+                                                        className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_rgba(52,211,153,0.8)]"
                                                     />
                                                 )}
                                             </div>

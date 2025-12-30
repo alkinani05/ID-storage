@@ -182,21 +182,19 @@ export class DocumentsService {
         oneTimeDownload?: boolean;
         maxViews?: number;
     }) {
-        // Check ownership
         const doc = await this.prisma.document.findFirst({ where: { id: docId, userId } });
-        if (!doc) throw new Error('Not found');
+        if (!doc) throw new Error('Document not found');
 
         const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + (options?.expiryHours || 1));
+        expiresAt.setHours(expiresAt.getHours() + (options?.expiryHours || 24));
 
-        // Determine access type based on permissions
+        const allowDownload = options?.allowDownload ?? false;
+        const allowPrint = options?.allowPrint ?? true;
+        
         let accessType: 'VIEW' | 'DOWNLOAD' | 'PRINT_ONLY' = 'VIEW';
-        if (options?.allowDownload) {
-            accessType = 'DOWNLOAD';
-        } else if (options?.allowPrint && !options?.allowDownload) {
-            accessType = 'PRINT_ONLY';
-        }
+        if (allowDownload) accessType = 'DOWNLOAD';
+        else if (allowPrint) accessType = 'PRINT_ONLY';
 
         return this.prisma.documentShare.create({
             data: {
@@ -204,8 +202,8 @@ export class DocumentsService {
                 token,
                 expiresAt,
                 accessType,
-                allowDownload: options?.allowDownload ?? false,
-                allowPrint: options?.allowPrint ?? true,
+                allowDownload,
+                allowPrint,
                 oneTimeDownload: options?.oneTimeDownload ?? false,
                 maxViews: options?.maxViews ?? null,
             }
@@ -228,29 +226,25 @@ export class DocumentsService {
     }
 
     async deleteDocument(userId: string, docId: string) {
-        // Check ownership
         const doc = await this.prisma.document.findFirst({ where: { id: docId, userId } });
-        if (!doc) throw new Error('Not found or unauthorized');
+        if (!doc) throw new Error('Document not found or unauthorized');
 
-        // Delete extracted data first (foreign key constraint)
+        // Delete extracted data
         await this.prisma.extractedData.deleteMany({ where: { documentId: docId } });
 
         // Delete shares
         await this.prisma.documentShare.deleteMany({ where: { documentId: docId } });
 
-        // Delete the document
+        // Delete the document record
         await this.prisma.document.delete({ where: { id: docId } });
 
-        // Optionally delete the file from disk
-        try {
-            if (doc.r2Key && fs.existsSync(doc.r2Key)) {
-                fs.unlinkSync(doc.r2Key);
-            }
-        } catch (e) {
-            this.logger.warn('Failed to delete file from disk', e);
+        // Delete physical file
+        if (doc.r2Key && fs.existsSync(doc.r2Key)) {
+            fs.unlinkSync(doc.r2Key);
+            this.logger.log(`Deleted file: ${doc.r2Key}`);
         }
 
-        return { success: true, message: 'Document deleted' };
+        return { success: true, message: 'Document deleted successfully' };
     }
 
     async processChat(userId: string, message: string) {
@@ -304,23 +298,25 @@ export class DocumentsService {
             include: { document: { include: { extractedData: true } } }
         });
 
-        if (!share) throw new Error('Invalid link');
-        if (new Date() > share.expiresAt) throw new Error('Link expired');
+        if (!share) throw new Error('Invalid or expired link');
+        if (new Date() > share.expiresAt) throw new Error('Link has expired');
 
-        // Check max views
         if (share.maxViews && share.viewsCount >= share.maxViews) {
-            throw new Error('Maximum views reached');
+            throw new Error('Maximum views limit reached');
         }
 
-        // Increment view count
         await this.prisma.documentShare.update({
             where: { id: share.id },
             data: { viewsCount: share.viewsCount + 1 }
         });
 
-        // Return document with permission metadata
         return {
-            document: share.document,
+            document: {
+                ...share.document,
+                fileUrl: share.allowDownload || share.document.mimeType?.startsWith('image') || share.document.mimeType === 'application/pdf'
+                    ? `/share/${token}/file` 
+                    : null
+            },
             permissions: {
                 allowDownload: share.allowDownload,
                 allowPrint: share.allowPrint,
@@ -340,12 +336,11 @@ export class DocumentsService {
             include: { document: true }
         });
 
-        if (!share) throw new Error('Invalid link');
-        if (new Date() > share.expiresAt) throw new Error('Link expired');
-        if (!share.allowDownload) throw new Error('Download not allowed for this share');
+        if (!share) throw new Error('Invalid or expired link');
+        if (new Date() > share.expiresAt) throw new Error('Link has expired');
+        if (!share.allowDownload) throw new Error('Download not permitted for this link');
         if (share.oneTimeDownload && share.downloadUsed) throw new Error('Download already used');
 
-        // Mark as used if one-time download
         if (share.oneTimeDownload) {
             await this.prisma.documentShare.update({
                 where: { id: share.id },
@@ -359,10 +354,32 @@ export class DocumentsService {
         return { path: doc.r2Key, filename: doc.originalName || doc.title };
     }
 
+    async getSharedFilePath(token: string) {
+        const share = await this.prisma.documentShare.findUnique({
+            where: { token },
+            include: { document: true }
+        });
+
+        if (!share) throw new Error('Invalid or expired link');
+        if (new Date() > share.expiresAt) throw new Error('Link has expired');
+
+        const doc = share.document;
+        
+        this.logger.debug(`Accessing shared file - Token: ${token}, DocId: ${doc.id}, Path: ${doc.r2Key}`);
+        
+        if (!doc.r2Key) throw new Error('File path not found');
+        if (!fs.existsSync(doc.r2Key)) {
+            this.logger.error(`File not found on disk: ${doc.r2Key}`);
+            throw new Error('File not found');
+        }
+
+        return { path: doc.r2Key, mimeType: doc.mimeType };
+    }
+
     async getDocumentPath(userId: string, docId: string) {
         const doc = await this.prisma.document.findFirst({ where: { id: docId, userId } });
-        if (!doc) throw new Error('Not found');
-        if (!doc.r2Key || !fs.existsSync(doc.r2Key)) throw new Error('File not found on disk');
+        if (!doc) throw new Error('Document not found');
+        if (!doc.r2Key || !fs.existsSync(doc.r2Key)) throw new Error('File not found');
 
         return { path: doc.r2Key, filename: doc.originalName || doc.title };
     }

@@ -11,7 +11,20 @@ export class ShareController {
         try {
             return await this.documentsService.getSharedDocument(token);
         } catch (e: any) {
-            throw new HttpException(e.message || 'Error', HttpStatus.FORBIDDEN);
+            throw new HttpException(e.message || 'Access denied', HttpStatus.FORBIDDEN);
+        }
+    }
+
+    @Get(':token/file')
+    async getSharedFile(@Param('token') token: string, @Res() res: Response) {
+        try {
+            const { path, mimeType } = await this.documentsService.getSharedFilePath(token);
+            const absolutePath = path.startsWith('/') ? path : require('path').resolve(path);
+            res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+            return res.sendFile(absolutePath);
+        } catch (e: any) {
+            throw new HttpException(e.message || 'File access denied', HttpStatus.FORBIDDEN);
         }
     }
 
