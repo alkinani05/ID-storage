@@ -51,7 +51,7 @@ const SVG_GENERIC = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height=
 
 // Mock Interceptor for Static Demo
 api.interceptors.request.use(async (config) => {
-    const isMock = (typeof window !== 'undefined' && localStorage.getItem('isMockMode') === 'true');
+    const isMock = (typeof window !== 'undefined' && localStorage.getItem('isMockMode') === 'true') || process.env.NEXT_PUBLIC_USE_MOCK_API === 'true';
 
     if (isMock) {
         // Mock Login
