@@ -293,9 +293,13 @@ export default function Dashboard() {
             const formData = new FormData();
             formData.append('file', file);
             try {
-                await api.post('/documents/upload', formData, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } });
+                await api.post('/documents/upload', formData, { headers: { Authorization: `Bearer ${token}` } });
                 fetchDocuments();
-            } catch (e) { setDocuments(prev => prev.filter(d => d.id !== tempId)); alert("فشل الرفع"); }
+            } catch (e: any) {
+                console.error("Upload failed:", e);
+                setDocuments(prev => prev.filter(d => d.id !== tempId));
+                alert(`فشل الرفع: ${e.response?.data?.message || e.message || 'خطأ غير معروف'}`);
+            }
         }
     }, []);
 
@@ -750,9 +754,7 @@ export default function Dashboard() {
         formData.append('category', selectedDocType);
 
         try {
-            await api.post('/documents/upload', formData, {
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
-            });
+            await api.post('/documents/upload', formData, { headers: { Authorization: `Bearer ${token}` } });
             fetchDocuments();
         } catch (e) {
             setDocuments(prev => prev.filter(d => d.id !== tempId));
@@ -1207,7 +1209,7 @@ export default function Dashboard() {
                     selectedDoc && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-8" onClick={() => setSelectedDoc(null)}>
                             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} onClick={e => e.stopPropagation()} className="bg-slate-900 rounded-3xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-white/10 flex flex-col md:flex-row">
-                                
+
                                 {/* Left Side: Image Preview */}
                                 <div className="w-full md:w-1/2 bg-black/50 p-6 flex items-center justify-center border-b md:border-b-0 md:border-l border-white/10 relative">
                                     {selectedDoc.id && (selectedDoc.category === 'PASSPORT' || selectedDoc.category === 'ID_CARD' || selectedDoc.mimeType?.startsWith('image')) ? (

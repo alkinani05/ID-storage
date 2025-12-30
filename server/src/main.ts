@@ -13,7 +13,7 @@ async function bootstrap() {
         // Robust CORS configuration
         const allowedOrigins = process.env.CORS_ORIGIN
             ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
-            : ['http://localhost:3000', 'http://localhost:3001'];
+            : ['http://localhost:3000', 'http://localhost:3001', 'https://wathiqni-vault-husam05.web.app', 'https://wathiqni-vault-husam05.firebaseapp.com'];
 
         app.enableCors({
             origin: (origin, callback) => {
@@ -39,7 +39,16 @@ async function bootstrap() {
             }),
         );
 
+        // Increase body limit for large file processing
+        app.use(express.json({ limit: '50mb' }));
+        app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
         const uploadPath = join(process.cwd(), 'uploads');
+        // Ensure upload directory exists
+        const fs = require('fs');
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
         app.use('/uploads', express.static(uploadPath));
 
         const PORT = process.env.PORT || 3001;
